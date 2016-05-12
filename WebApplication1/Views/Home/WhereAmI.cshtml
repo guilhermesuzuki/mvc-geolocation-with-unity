@@ -1,0 +1,9 @@
+﻿@model Services.IpLocation.LocationModel
+@if (Model != null)
+{
+    <p>You are at @Model.City, Country @Model.Country</p>
+}
+else
+{
+    <p>no location</p>
+}
