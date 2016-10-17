@@ -16,9 +16,10 @@ namespace WebApplication1.Controllers
         public HomeController()
         {
             //looks for a 'callable' service instance with the least number of queries made from it
-            this.IpLocation = UnityConfig.GetConfiguredContainer().ResolveAll<Services.IpLocation.ILocationService>()
+            this.IpLocation = UnityConfig.GetConfiguredContainer()
+                .ResolveAll<Services.IpLocation.ILocationService>()
                 .Where(x => x.IsUnderThresholdLimit)
-                .OrderBy(x => x.NumberOfQueriesMade)
+                .OrderBy(x => x.UnsuccessfulCalls).ThenBy(x => x.NumberOfQueriesMade)
                 .FirstOrDefault();
         }
 

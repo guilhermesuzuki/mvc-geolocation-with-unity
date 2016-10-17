@@ -81,15 +81,47 @@ namespace Services.IpLocation.Concrete
         }
 
         /// <summary>
+        /// Nmuber of unsuccessful calls
+        /// </summary>
+        public int UnsuccessfulCalls
+        {
+            get
+            {
+                var key = "freegeoip-unsuccessfulcalls";
+
+                if (HttpContext.Current.Cache[key] == null)
+                {
+                    lock (SyncRoot)
+                    {
+                        if (HttpContext.Current.Cache[key] == null)
+                        {
+                            //first call within the hour limit
+                            HttpContext.Current.Cache.Add(key, 0, null, DateTime.Now.AddHours(1), Cache.NoSlidingExpiration, CacheItemPriority.Default, null);
+                        }
+                    }
+                }
+
+                return (int)HttpContext.Current.Cache[key];
+            }
+
+            set
+            {
+                //dummy call to create cache (if needed)
+                var current = this.UnsuccessfulCalls;
+                HttpContext.Current.Cache["freegeoip-unsuccessfulcalls"] = value;
+            }
+        }
+
+        /// <summary>
         /// Tries to find a location from an ip
         /// </summary>
         /// <param name="ip"></param>
         /// <returns></returns>
         public LocationModel Find(string ip)
         {
-            try
+            if (string.IsNullOrWhiteSpace(ip) == false)
             {
-                if (string.IsNullOrWhiteSpace(ip) == false)
+                try
                 {
                     var url = "http://freegeoip.net/json/" + ip;
                     var req = WebRequest.CreateHttp(url);
@@ -106,6 +138,9 @@ namespace Services.IpLocation.Concrete
 
                         //{"ip":"174.119.112.99","country_code":"CA","country_name":"Canada","region_code":"ON","region_name":"Ontario","city":"Toronto","zip_code":"M6E","time_zone":"America/Toronto","latitude":43.6889,"longitude":-79.4507,"metro_code":0}
 
+                        //adds this call to the current threshold
+                        this.NumberOfQueriesMade += 1;
+
                         return new LocationModel(ip)
                         {
                             City = json.Value<string>("city"),
@@ -120,17 +155,15 @@ namespace Services.IpLocation.Concrete
                         };
                     }
                 }
-            }
-            catch (Exception)
-            {
-                //TODO: log this error?
-            }
-            finally
-            {
-
+                catch
+                {
+                    this.UnsuccessfulCalls += 1;
+                    throw;
+                }
             }
 
-            return null;
+            //so it can be catch with the proper message from the framework
+            throw new ArgumentNullException("ip");
         }
     }
 }
