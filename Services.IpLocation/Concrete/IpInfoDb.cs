@@ -42,7 +42,7 @@ namespace Services.IpLocation.Concrete
         {
             get
             {
-                return this.NumberOfQueriesMade < this.ThresoldLimit;
+                return (this.NumberOfQueriesMade + this.UnsuccessfulCalls) < this.ThresoldLimit;
             }
         }
 
@@ -53,7 +53,7 @@ namespace Services.IpLocation.Concrete
         {
             get
             {
-                var key = "ipinfodb-threshold-" + ApiKey;
+                var key = $"ipinfodb-threshold-{ApiKey}";
 
                 if (HttpContext.Current.Cache[key] == null)
                 {
@@ -62,7 +62,9 @@ namespace Services.IpLocation.Concrete
                         if (HttpContext.Current.Cache[key] == null)
                         {
                             //although there's no limit for queries
-                            HttpContext.Current.Cache.Add(key, 0, null, DateTime.Now.AddHours(5), Cache.NoSlidingExpiration, CacheItemPriority.Default, null);
+                            HttpContext.Current.Cache.Add(key, 0, null, DateTime.Now.AddHours(5), Cache.NoSlidingExpiration, CacheItemPriority.Default,
+                                (k, v, r) => { this.UnsuccessfulCalls = 0; }
+                                );
                         }
                     }
                 }
@@ -74,7 +76,7 @@ namespace Services.IpLocation.Concrete
             {
                 //dummy call to create cache (if needed)
                 var current = this.NumberOfQueriesMade;
-                HttpContext.Current.Cache["ipinfodb-threshold-" + ApiKey] = value;
+                HttpContext.Current.Cache[$"ipinfodb-threshold-{ApiKey}"] = value;
             }
         }
 
@@ -86,32 +88,20 @@ namespace Services.IpLocation.Concrete
             get { return int.MaxValue; }
         }
 
+        /// <summary>
+        /// Number of Unsuccessful calls made
+        /// </summary>
         public int UnsuccessfulCalls
         {
             get
             {
-                var key = "ipinfodb-unsuccessfulcalls-" + ApiKey;
-
-                if (HttpContext.Current.Cache[key] == null)
-                {
-                    lock (SyncRoot)
-                    {
-                        if (HttpContext.Current.Cache[key] == null)
-                        {
-                            //although there's no limit for queries
-                            HttpContext.Current.Cache.Add(key, 0, null, DateTime.Now.AddHours(5), Cache.NoSlidingExpiration, CacheItemPriority.Default, null);
-                        }
-                    }
-                }
-
-                return (int)HttpContext.Current.Cache[key];
+                var key = $"ipinfodb-unsuccessfulcalls-{ApiKey}";
+                return HttpRuntime.Cache[key] == null || HttpRuntime.Cache[key] is int == false ? 0 : (int)HttpRuntime.Cache[key];
             }
-
             set
             {
-                //dummy call to create cache (if needed)
-                var current = this.UnsuccessfulCalls;
-                HttpContext.Current.Cache["ipinfodb-unsuccessfulcalls-" + ApiKey] = value;
+                var key = $"ipinfodb-unsuccessfulcalls-{ApiKey}";
+                HttpRuntime.Cache[key] = value;
             }
         }
 

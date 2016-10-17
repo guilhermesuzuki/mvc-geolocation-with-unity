@@ -36,7 +36,7 @@ namespace Services.IpLocation.Concrete
         {
             get
             {
-                return this.NumberOfQueriesMade < this.ThresoldLimit;
+                return (this.NumberOfQueriesMade + this.UnsuccessfulCalls) < this.ThresoldLimit;
             }
         }
 
@@ -56,7 +56,9 @@ namespace Services.IpLocation.Concrete
                         if (HttpContext.Current.Cache[key] == null)
                         {
                             //first call within the hour limit
-                            HttpContext.Current.Cache.Add(key, 0, null, DateTime.Now.AddHours(1), Cache.NoSlidingExpiration, CacheItemPriority.Default, null);
+                            HttpContext.Current.Cache.Add(key, 0, null, DateTime.Now.AddHours(1), Cache.NoSlidingExpiration, CacheItemPriority.Default, 
+                                (k,v,r) => { this.UnsuccessfulCalls = 0; }
+                                );
                         }
                     }
                 }
@@ -81,34 +83,18 @@ namespace Services.IpLocation.Concrete
         }
 
         /// <summary>
-        /// Nmuber of unsuccessful calls
+        /// Number of Unsuccessful calls made
         /// </summary>
         public int UnsuccessfulCalls
         {
             get
             {
-                var key = "freegeoip-unsuccessfulcalls";
-
-                if (HttpContext.Current.Cache[key] == null)
-                {
-                    lock (SyncRoot)
-                    {
-                        if (HttpContext.Current.Cache[key] == null)
-                        {
-                            //first call within the hour limit
-                            HttpContext.Current.Cache.Add(key, 0, null, DateTime.Now.AddHours(1), Cache.NoSlidingExpiration, CacheItemPriority.Default, null);
-                        }
-                    }
-                }
-
-                return (int)HttpContext.Current.Cache[key];
+                var key = $"freegeoip-unsuccessfulcalls";
+                return HttpRuntime.Cache[key] == null || HttpRuntime.Cache[key] is int == false ? 0 : (int)HttpRuntime.Cache[key];
             }
-
             set
             {
-                //dummy call to create cache (if needed)
-                var current = this.UnsuccessfulCalls;
-                HttpContext.Current.Cache["freegeoip-unsuccessfulcalls"] = value;
+                HttpRuntime.Cache[$"freegeoip-unsuccessfulcalls"] = value;
             }
         }
 
@@ -126,9 +112,6 @@ namespace Services.IpLocation.Concrete
                     var url = "http://freegeoip.net/json/" + ip;
                     var req = WebRequest.CreateHttp(url);
                     var res = req.GetResponse();
-
-                    //adds this call to the current threshold
-                    this.NumberOfQueriesMade += 1;
 
                     using (res)
                     {
